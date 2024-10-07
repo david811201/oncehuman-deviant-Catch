@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OnceHuman七日世界 大世界異常物捕捉紀錄</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #000000;
+      color: #ffffff;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 20px auto;
+      padding: 20px;
+      border: 1px solid #444;
+      background-color: #1a1a1a;
+    }
+    .row {
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .btn {
+      padding: 8px 12px;
+      background-color: #007BFF;
+      color: white;
+      border: none;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+    .record-btn {
+      background-color: #FF0000;
+      color: #FFFFFF;
+    }
+    .time {
+      width: 100px;
+      text-align: center;
+    }
+    .bold-text {
+      font-weight: bold;
+      margin-right: 10px;
+    }
+    .stats {
+      margin-top: 20px;
+    }
+    select {
+      margin-left: 5px;
+    }
+    footer {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 14px;
+      color: #ffffff;
+    }
+    .log-container {
+      margin-top: 20px;
+      padding: 10px;
+      border: 1px solid #444;
+      height: 200px;
+      background-color: #333;
+      color: white;
+      overflow-y: auto;
+    }
+    .red-text {
+      color: red;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>OnceHuman七日世界 大世界異常物捕捉紀錄</h1>
+
+    <div id="streams"></div>
+
+    <!-- 當前輪數和下一輪 -->
+    <div class="row" id="roundSection">
+      <span class="bold-text">當前輪數: <span id="currentRound">1</span></span>
+      <div style="flex-grow: 1;"></div> <!-- 增加間距 -->
+      <button class="btn" id="nextRoundBtn">下一輪</button>
+    </div>
+
+    <!-- 捕獲統計 -->
+    <div class="stats bold-text">
+      捕獲統計: 
+      <span>等級5: <span id="level5Count">0</span></span> |
+      <span>等級4: <span id="level4Count">0</span></span> |
+      <span>等級3: <span id="level3Count">0</span></span> |
+      <span>等級2: <span id="level2Count">0</span></span> |
+      <span>等級1: <span id="level1Count">0</span></span> |
+      <span>異色數: <span id="colorVariantCount">0</span></span>
+    </div>
+
+    <!-- 捕獲記錄 -->
+    <h2>捕獲記錄</h2>
+    <div class="log-container" id="logContainer"></div>
+
+    <footer>
+      作者: 巴哈姆特 Doggie
+    </footer>
+  </div>
+
+  <script>
+    const numStreams = 10;
+    const refreshTimeYes = 20 * 60 * 1000;
+    const refreshTimeNo = 35 * 60 * 1000;
+
+    const streamsContainer = document.getElementById('streams');
+    const logContainer = document.getElementById('logContainer');
+    const currentRoundDisplay = document.getElementById('currentRound');
+    let currentRound = 1;
+
+    let streamElements = []; // 儲存分流相關的元素
+    let previousTimes = Array(numStreams).fill(null); // 儲存上一輪的時間
+
+    // 創建每個分流的行
+    for (let i = 1; i <= numStreams; i++) {
+      const row = document.createElement('div');
+      row.classList.add('row');
+
+      // 分流編號
+      const streamName = document.createElement('span');
+      streamName.classList.add('bold-text');
+      streamName.innerText = `分流 ${i}`;
+      row.appendChild(streamName);
+
+      // 捕獲按鈕和顯示時間
+      const captureBtn = document.createElement('button');
+      captureBtn.classList.add('btn');
+      captureBtn.innerText = '捕獲';
+      row.appendChild(captureBtn);
+
+      const captureTimeDisplay = document.createElement('span');
+      captureTimeDisplay.classList.add('time');
+      captureTimeDisplay.innerText = '--:--:--';
+      row.appendChild(captureTimeDisplay);
+
+      // 未捕獲按鈕
+      const noCaptureBtn = document.createElement('button');
+      noCaptureBtn.classList.add('btn');
+      noCaptureBtn.innerText = '未捕獲';
+      row.appendChild(noCaptureBtn);
+
+      // 下次刷新時間
+      const nextCaptureLabel = document.createElement('span');
+      nextCaptureLabel.classList.add('bold-text');
+      nextCaptureLabel.innerText = '下次刷新時間';
+      row.appendChild(nextCaptureLabel);
+
+      const nextTimeDisplay = document.createElement('span');
+      nextTimeDisplay.classList.add('time');
+      nextTimeDisplay.innerText = '--:--:--';
+      row.appendChild(nextTimeDisplay);
+
+      // 捕獲等級下拉選單
+      const levelLabel = document.createElement('span');
+      levelLabel.classList.add('bold-text');
+      levelLabel.innerText = '捕獲等級';
+      row.appendChild(levelLabel);
+
+      const levelSelect = document.createElement('select');
+      levelSelect.name = `level${i}`;
+      ['等級 1', '等級 2', '等級 3', '等級 4', '等級 5'].forEach(level => {
+        const option = document.createElement('option');
+        option.value = level;
+        option.innerText = level;
+        levelSelect.appendChild(option);
+      });
+      row.appendChild(levelSelect);
+
+      // 是否異色下拉選單
+      const colorLabel = document.createElement('span');
+      colorLabel.classList.add('bold-text');
+      colorLabel.innerText = '是否異色';
+      row.appendChild(colorLabel);
+
+      const colorSelect = document.createElement('select');
+      colorSelect.name = `color${i}`;
+      ['是', '否'].forEach((optionText, index) => {
+        const option = document.createElement('option');
+        option.value = optionText;
+        option.innerText = optionText;
+        if (index === 1) option.selected = true; // 默認設為"否"
+        colorSelect.appendChild(option);
+      });
+      row.appendChild(colorSelect);
+
+      let captureStatus = ''; 
+
+      // 捕獲或未捕獲按鈕邏輯
+      captureBtn.onclick = () => {
+        const currentTime = new Date();
+        captureTimeDisplay.innerText = currentTime.toLocaleTimeString();
+        captureStatus = '已捕獲';
+
+        const nextTime = new Date(currentTime.getTime() + refreshTimeYes);
+        nextTimeDisplay.innerText = nextTime.toLocaleTimeString();
+        nextTimeDisplay.style.color = 'yellow'; 
+      };
+
+      noCaptureBtn.onclick = () => {
+        const currentTime = new Date();
+        captureTimeDisplay.innerText = currentTime.toLocaleTimeString();
+        captureStatus = '未捕獲';
+
+        const nextTime = new Date(currentTime.getTime() + refreshTimeNo);
+        nextTimeDisplay.innerText = nextTime.toLocaleTimeString();
+        nextTimeDisplay.style.color = 'red'; 
+      };
+
+      // 即時記錄按鈕
+      const logBtn = document.createElement('button');
+      logBtn.classList.add('btn', 'record-btn');
+      logBtn.innerText = '即時記錄';
+      logBtn.onclick = () => {
+        const currentTime = new Date();
+        const logEntry = document.createElement('div');
+        const time = captureTimeDisplay.innerText;
+        const level = levelSelect.value;
+        const color = colorSelect.value;
+
+        let logText = `分流 ${i} ${captureStatus} | 時間: ${time} | 捕獲等級: ${level} | 是否異色: ${color} | 當前輪數: ${currentRound}`;
+        
+        // 計算與上一輪的時間間隔
+        if (previousTimes[i - 1]) {
+          const previousTime = previousTimes[i - 1];
+          const timeDiff = currentTime - previousTime;
+          const minutesDiff = Math.floor(timeDiff / 1000 / 60); // 將毫秒轉換為分鐘
+          logText += ` | 與上一輪時間間隔為 ${minutesDiff} 分鐘`;
+        }
+
+        logEntry.innerText = logText;
+
+        // 顯示等級5時使用紅色粗體字
+        if (level === '等級 5') {
+          logEntry.classList.add('red-text');
+        }
+
+        // 顯示是否異色為"是"時使用紅色粗體字
+        if (color === '是') {
+          logEntry.classList.add('red-text');
+        }
+
+        logContainer.appendChild(logEntry);
+
+        // 更新當前時間作為下一輪的“上一輪時間”
+        previousTimes[i - 1] = currentTime;
+      };
+      row.appendChild(logBtn);
+
+      streamsContainer.appendChild(row);
+
+      // 儲存每個分流的相關元素
+      streamElements.push({
+        captureTimeDisplay,
+        nextTimeDisplay,
+        levelSelect,
+        colorSelect
+      });
+    }
+
+    // 下一輪按鈕邏輯
+    document.getElementById('nextRoundBtn').onclick = () => {
+      currentRound++;
+      currentRoundDisplay.innerText = currentRound;
+
+      // 重置分流時間、等級和異色選項
+      let levelCounts = { '等級 5': 0, '等級 4': 0, '等級 3': 0, '等級 2': 0, '等級 1': 0 };
+      let colorVariantCount = 0;
+
+      streamElements.forEach(stream => {
+        stream.captureTimeDisplay.innerText = '--:--:--';
+        stream.nextTimeDisplay.innerText = '--:--:--';
+
+        const selectedLevel = stream.levelSelect.value;
+        const selectedColor = stream.colorSelect.value;
+
+        // 計算捕獲等級
+        if (levelCounts[selectedLevel] !== undefined) {
+          levelCounts[selectedLevel]++;
+        }
+
+        // 計算異色
+        if (selectedColor === '是') {
+          colorVariantCount++;
+        }
+
+        stream.levelSelect.selectedIndex = 0;
+        stream.colorSelect.selectedIndex = 1; // 默認設為"否"
+      });
+
+      // 更新統計數據
+      document.getElementById('level5Count').innerText = levelCounts['等級 5'];
+      document.getElementById('level4Count').innerText = levelCounts['等級 4'];
+      document.getElementById('level3Count').innerText = levelCounts['等級 3'];
+      document.getElementById('level2Count').innerText = levelCounts['等級 2'];
+      document.getElementById('level1Count').innerText = levelCounts['等級 1'];
+      document.getElementById('colorVariantCount').innerText = colorVariantCount;
+    };
+  </script>
+</body>
+</html>
